@@ -1,0 +1,160 @@
+Practical Machine Learning 
+========================================================
+---
+title: "MACHINE LEARNING PREDICTION"
+output: html_document
+---
+
+Overview
+----------------
+
+This document is the final report of the Peer Assessment project from Coursera's course Practical Machine Learning, as part of the Specialization in Data Science. It was built up in RStudio, using its knitr functions, meant to be published in html format.
+This analysis meant to be the basis for the course quiz and a prediction assignment writeup. The main goal of the project is to predict the manner in which 6 participants performed some exercise as described below. This is the "classe" variable in the training set. The machine learning algorithm described here is applied to the 20 test cases available in the test data and the predictions are submitted in appropriate format to the Course Project Prediction Quiz for automated grading.
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz3xsbS5bVX
+
+
+
+## Data Processing
+
+###Import The Data
+
+<br />
+
+We first upload the R libraries that are necessary for the complete analysis.
+
+The next step is loading the dataset from the URL provided above. The training dataset is then partinioned in 2 to create a Training set (70% of the data) for the modeling process and a Test set (with the remaining 30%) for the validations. The testing dataset is not changed and will only be used for the quiz results generation.
+
+<br />
+
+```{r results='hide', message=FALSE, warning=FALSE}
+library(knitr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(randomForest)
+library(corrplot)
+set.seed(12345)
+
+setwd('C://Users//jieya//OneDrive//Documents//R//Module 8 Practical Machine Learning')
+
+# read the datasets
+training <- read.csv("pml-training.csv", na.strings = c("NA", ""))
+testing  <- read.csv("pml-testing.csv", na.strings = c("NA", ""))
+
+```
+
+###Splitting data into Training Set and Test Set
+
+```{r echo=TRUE}
+# create a partition with the training dataset 
+inTrain  <- createDataPartition(training$classe, p=0.7, list=FALSE)
+TrainSet <- training[inTrain, ]
+TestSet  <- training[-inTrain, ]
+dim(TrainSet)
+dim(TestSet)
+```
+
+Both created datasets have 160 variables. Those variables have plenty of NA, that can be removed with the cleaning procedures below. The Near Zero variance (NZV) variables are also removed and the ID variables as well.
+
+<br />
+```{r echo=TRUE}
+NZV <- nearZeroVar(TrainSet)
+TrainSet <- TrainSet[, -NZV]
+TestSet  <- TestSet[, -NZV]
+```
+<br />
+
+###Data Cleaning
+
+ 1. Remove NA variables from the dataset.
+ 2. Remove the variables for identification (Column 1 to 5)
+
+```{r echo=TRUE}
+AllNA    <- sapply(TrainSet, function(x) mean(is.na(x))) > 0.95
+TrainSet <- TrainSet[, AllNA==FALSE]
+TestSet  <- TestSet[, AllNA==FALSE]
+
+
+TrainSet <- TrainSet[, -(1:5)]
+TestSet  <- TestSet[, -(1:5)]
+dim(TrainSet)
+dim(TestSet)
+
+```
+
+54 variables are left after data cleaning. 
+
+<br />
+##Data Analysis
+
+### a) Correlation Analysis 
+
+```{r echo=TRUE}
+corMatrix <- cor(TrainSet[, -54])
+
+
+par(mar=c(1,1,1,1))
+corrplot(corMatrix, order = "hclust" , type = "upper",tl.cex = 0.5)
+
+
+```
+The highly correlated variables are shown in dark colors in the graph above. To make an evem more compact analysis, a PCA (Principal Components Analysis) could be performed as pre-processing step to the datasets. Nevertheless, as the correlations are quite few, this step will not be applied for this assignment.
+
+
+<br />
+##Prediction Model
+
+Two methods will be applied to model the regressions (in the Train dataset) and the best one (with higher accuracy when applied to the Test dataset) will be used for the quiz predictions. The methods are: Random Forests and Decision Tree, as described below.
+A Confusion Matrix is plotted at the end of each analysis to better visualize the accuracy of the models.
+
+### a) Random Forest
+
+```{r echo=TRUE}
+set.seed(12345)
+controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+modFitRandForest <- train(classe ~ ., data=TrainSet, method="rf",
+                          trControl=controlRF)
+modFitRandForest$finalModel
+
+predictRandForest <- predict(modFitRandForest, newdata=TestSet)
+confMatRandForest <- confusionMatrix(predictRandForest, TestSet$classe)
+confMatRandForest
+```
+<br />
+
+### a) Decision Tree
+
+```{r echo=TRUE}
+set.seed(12345)
+modFitDecTree <- rpart(classe ~ ., data=TrainSet, method="class")
+fancyRpartPlot(modFitDecTree)
+
+predictDecTree <- predict(modFitDecTree, newdata=TestSet, type="class")
+confMatDecTree <- confusionMatrix(predictDecTree, TestSet$classe)
+confMatDecTree
+
+```
+<br />
+
+##Data Validation using Confusion Matrix
+
+The accuracy of the 2 regression modeling methods above are:
+
+Random Forest : 0.9963
+Decision Tree : 0.7368
+
+
+```{r echo=TRUE}
+
+
+predictTEST <- predict(modFitRandForest, newdata=testing)
+predictTEST
+```
+<br />
+<br />
+<br />
+<br />
